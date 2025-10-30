@@ -37,10 +37,26 @@ A local-only React app to create and play custom game shows: **Price Is Right**,
 
 ## Deploy to Vercel
 
-1. Push your code to GitHub
-2. Import the repository in [Vercel](https://vercel.com)
-3. Vercel will auto-detect Vite settings
-4. Deploy! The `vercel.json` config handles SPA routing
+1. **Push your code to GitHub**
+
+2. **Import the repository in [Vercel](https://vercel.com)**
+   - Click "New Project"
+   - Import your GitHub repository
+
+3. **Configure build settings:**
+   - **Framework Preset:** Vite (should auto-detect)
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install` (default)
+
+4. **Deploy!** The `vercel.json` config handles SPA routing for React Router
+
+### If you get a blank screen:
+
+1. Check the browser console (F12) for JavaScript errors
+2. Verify the build completed successfully in Vercel's build logs
+3. Make sure the Output Directory is set to `dist`
+4. Ensure the Build Command is `npm run build`
 
 ## Tech Stack
 
