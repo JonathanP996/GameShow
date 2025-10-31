@@ -13,6 +13,11 @@ export default function Play() {
   const [editingTeams, setEditingTeams] = useState(false)
   const [teamAName, setTeamAName] = useState(game?.teams.teamA || 'Team A')
   const [teamBName, setTeamBName] = useState(game?.teams.teamB || 'Team B')
+  const [isLoading, setIsLoading] = useState(true)
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
+  const [successPoints, setSuccessPoints] = useState(0)
+  const [successTeam, setSuccessTeam] = useState('')
+  const [showWrongAnimation, setShowWrongAnimation] = useState(false)
 
   const toggleFullscreen = () => {
     const el: any = document.fullscreenElement || (document as any).webkitFullscreenElement
@@ -35,8 +40,43 @@ export default function Play() {
       setTeamBName(game.teams.teamB)
     }
   }, [game?.teams.teamA, game?.teams.teamB])
+
+  // Loading screen animation
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 2000) // 2 second loading screen
+    return () => clearTimeout(timer)
+  }, [])
   
   if (!game) return null
+
+  // Show loading screen
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-[#060CE9] flex items-center justify-center z-50">
+        <div className="text-center">
+          <img 
+            src="/jeopardy-logo.png" 
+            alt="Jeopardy" 
+            className="w-64 md:w-96 mx-auto animate-pulse mb-8"
+            style={{
+              animation: 'logoFloat 2s ease-in-out infinite'
+            }}
+          />
+          <div className="text-yellow-400 text-2xl md:text-4xl font-bold animate-pulse">
+            Loading Game...
+          </div>
+          <style>{`
+            @keyframes logoFloat {
+              0%, 100% { transform: translateY(0px) scale(1); }
+              50% { transform: translateY(-20px) scale(1.05); }
+            }
+          `}</style>
+        </div>
+      </div>
+    )
+  }
 
   const saveTeamNames = () => {
     if (!gameId) return
@@ -123,6 +163,143 @@ export default function Play() {
           </div>
         </div>
 
+        {/* Success Animation Overlay */}
+        {showSuccessAnimation && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 pointer-events-none">
+            <div className="text-center">
+              <div className="relative">
+                {/* Animated checkmark */}
+                <div className="text-green-400 text-8xl md:text-9xl font-bold mb-4" style={{
+                  animation: 'checkmarkPop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                }}>
+                  ✓
+                </div>
+                {/* Confetti effect */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {[...Array(20)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-3 h-3 rounded-full"
+                      style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        backgroundColor: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A'][Math.floor(Math.random() * 5)],
+                        animation: `confetti 1s ease-out ${i * 0.05}s forwards`,
+                        opacity: 0
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="text-yellow-400 text-5xl md:text-7xl font-bold mb-2" style={{
+                animation: 'scorePop 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s both'
+              }}>
+                +${successPoints.toLocaleString()}
+              </div>
+              <div className="text-white text-4xl md:text-6xl font-bold" style={{
+                animation: 'textSlide 0.8s ease-out 0.4s both'
+              }}>
+                {successTeam} Got It!
+              </div>
+            </div>
+            <style>{`
+              @keyframes checkmarkPop {
+                0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+                50% { transform: scale(1.2) rotate(10deg); }
+                100% { transform: scale(1) rotate(0deg); opacity: 1; }
+              }
+              @keyframes scorePop {
+                0% { transform: scale(0) translateY(50px); opacity: 0; }
+                50% { transform: scale(1.1) translateY(-10px); }
+                100% { transform: scale(1) translateY(0); opacity: 1; }
+              }
+              @keyframes textSlide {
+                0% { transform: translateX(-100px); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+              }
+              @keyframes confetti {
+                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+                100% { transform: translateY(-200px) rotate(720deg); opacity: 0; }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Wrong Answer Animation Overlay */}
+        {showWrongAnimation && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 pointer-events-none">
+            <div className="text-center">
+              <div className="relative">
+                {/* Animated X mark */}
+                <div className="text-red-500 text-8xl md:text-9xl font-bold mb-4" style={{
+                  animation: 'xMarkShake 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                }}>
+                  ✗
+                </div>
+                {/* Red particles effect */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {[...Array(15)].map((_, i) => {
+                    const angle = (i / 15) * Math.PI * 2
+                    const distance = 150 + Math.random() * 100
+                    const x = Math.cos(angle) * distance
+                    const y = Math.sin(angle) * distance
+                    return (
+                      <div
+                        key={i}
+                        className="absolute w-2 h-2 rounded-full bg-red-500"
+                        style={{
+                          left: '50%',
+                          top: '50%',
+                          transform: `translate(${x}px, ${y}px) scale(0)`,
+                          animation: `wrongParticle 1.2s ease-out ${i * 0.03}s forwards`,
+                          opacity: 0
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="text-red-400 text-5xl md:text-7xl font-bold mb-2" style={{
+                animation: 'wrongTextPop 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.2s both'
+              }}>
+                Wrong Answer
+              </div>
+              <div className="text-gray-300 text-3xl md:text-5xl font-bold" style={{
+                animation: 'noPointsText 0.8s ease-out 0.4s both'
+              }}>
+                No Points
+              </div>
+            </div>
+            <style>{`
+              @keyframes xMarkShake {
+                0% { transform: scale(0) rotate(-90deg); opacity: 0; }
+                25% { transform: scale(1.3) rotate(-15deg); }
+                50% { transform: scale(0.9) rotate(15deg); }
+                75% { transform: scale(1.1) rotate(-5deg); }
+                100% { transform: scale(1) rotate(0deg); opacity: 1; }
+              }
+              @keyframes wrongTextPop {
+                0% { transform: scale(0) translateY(50px); opacity: 0; }
+                50% { transform: scale(1.1) translateY(-10px); }
+                100% { transform: scale(1) translateY(0); opacity: 1; }
+              }
+              @keyframes noPointsText {
+                0% { transform: translateX(100px); opacity: 0; }
+                100% { transform: translateX(0); opacity: 1; }
+              }
+              @keyframes wrongParticle {
+                0% { 
+                  transform: translate(0, 0) scale(1); 
+                  opacity: 1; 
+                }
+                100% { 
+                  opacity: 0; 
+                }
+              }
+            `}</style>
+          </div>
+        )}
+
         <JepPlay 
           questions={game.modes.jeopardy} 
           categories={game.modes.jeopardyCategories || ['', '', '', '', '', '']} 
@@ -130,16 +307,133 @@ export default function Play() {
           teamA={game.teams.teamA}
           teamB={game.teams.teamB}
           timerSeconds={game.questionTimerSeconds ?? 0}
-          onScores={(a,b,questionId)=>{
+          onScores={(a,b,questionId,points,teamName,isWrong)=>{
             if (!gameId) return
             updateGameAndMarkUsed(gameId, { teamA: a, teamB: b }, questionId)
+            // Show success animation for correct answers
+            if (points > 0 && !isWrong) {
+              setSuccessPoints(points)
+              setSuccessTeam(teamName)
+              setShowSuccessAnimation(true)
+              setTimeout(() => setShowSuccessAnimation(false), 2000)
+            }
+            // Show wrong animation for incorrect answers
+            if (isWrong) {
+              setShowWrongAnimation(true)
+              setTimeout(() => setShowWrongAnimation(false), 2000)
+            }
           }} 
         />
 
         {game.modes.jeopardy.filter(q=>!q.used).length === 0 && (
-          <div className="p-4 md:p-6 bg-yellow-50 border-2 border-yellow-400 rounded-lg text-center">
-            <div className="text-2xl md:text-3xl font-bold">🏆 {game.scores.teamA > game.scores.teamB ? game.teams.teamA : game.scores.teamB > game.scores.teamA ? game.teams.teamB : 'Tie Game!'} Wins!</div>
-            {game.scores.teamA === game.scores.teamB && <div className="text-lg md:text-xl mt-2">Both teams scored {game.scores.teamA} points!</div>}
+          <div className="fixed inset-0 bg-gradient-to-br from-[#060CE9] via-[#0715E6] to-[#0a1dff] flex items-center justify-center z-50 overflow-hidden">
+            {/* Background effects */}
+            <div className="absolute inset-0 overflow-hidden">
+              {[...Array(50)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute rounded-full opacity-20"
+                  style={{
+                    width: `${Math.random() * 200 + 50}px`,
+                    height: `${Math.random() * 200 + 50}px`,
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    backgroundColor: '#FFD700',
+                    animation: `float ${Math.random() * 10 + 10}s infinite ease-in-out`,
+                    animationDelay: `${Math.random() * 5}s`
+                  }}
+                />
+              ))}
+            </div>
+            
+            <div className="text-center relative z-10">
+              {/* Trophy animation */}
+              <div className="text-9xl md:text-[12rem] mb-8" style={{
+                animation: 'trophyFloat 2s ease-in-out infinite, trophySpin 3s ease-in-out infinite'
+              }}>
+                🏆
+              </div>
+              
+              {/* Winner text with cascade effect */}
+              <div className="mb-6">
+                <div className="text-yellow-400 text-6xl md:text-8xl font-bold mb-2" style={{
+                  animation: 'winnerText 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+                  textShadow: '0 0 20px rgba(255, 215, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.6)'
+                }}>
+                  {game.scores.teamA > game.scores.teamB ? game.teams.teamA : game.scores.teamB > game.scores.teamA ? game.teams.teamB : 'Tie Game!'}
+                </div>
+                <div className="text-yellow-300 text-4xl md:text-6xl font-bold" style={{
+                  animation: 'winsText 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s both'
+                }}>
+                  WINS!
+                </div>
+              </div>
+              
+              {/* Score display */}
+              {game.scores.teamA === game.scores.teamB ? (
+                <div className="text-yellow-200 text-2xl md:text-4xl mb-8" style={{
+                  animation: 'fadeInUp 1s ease-out 0.6s both'
+                }}>
+                  Both teams scored {game.scores.teamA} points!
+                </div>
+              ) : (
+                <div className="text-yellow-200 text-2xl md:text-4xl mb-8" style={{
+                  animation: 'fadeInUp 1s ease-out 0.6s both'
+                }}>
+                  Final Score: {game.scores.teamA > game.scores.teamB ? `${game.teams.teamA}: ${game.scores.teamA}` : `${game.teams.teamB}: ${game.scores.teamB}`}
+                </div>
+              )}
+              
+              {/* Button */}
+              <div className="mt-8" style={{
+                animation: 'buttonPop 1s ease-out 1s both'
+              }}>
+                <button 
+                  onClick={() => navigate('/')}
+                  className="px-8 py-4 bg-yellow-400 text-black font-bold text-2xl rounded-lg hover:bg-yellow-300 transition transform hover:scale-105 shadow-lg"
+                  style={{
+                    boxShadow: '0 0 30px rgba(255, 215, 0, 0.6)'
+                  }}
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+            
+            <style>{`
+              @keyframes trophyFloat {
+                0%, 100% { transform: translateY(0px) rotate(-5deg); }
+                50% { transform: translateY(-30px) rotate(5deg); }
+              }
+              @keyframes trophySpin {
+                0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8)); }
+                50% { filter: drop-shadow(0 0 40px rgba(255, 215, 0, 1)); }
+              }
+              @keyframes winnerText {
+                0% { transform: scale(0) translateY(100px); opacity: 0; }
+                60% { transform: scale(1.1) translateY(-10px); }
+                100% { transform: scale(1) translateY(0); opacity: 1; }
+              }
+              @keyframes winsText {
+                0% { transform: scale(0) translateY(100px); opacity: 0; }
+                60% { transform: scale(1.1) translateY(-10px); }
+                100% { transform: scale(1) translateY(0); opacity: 1; }
+              }
+              @keyframes fadeInUp {
+                0% { transform: translateY(30px); opacity: 0; }
+                100% { transform: translateY(0); opacity: 1; }
+              }
+              @keyframes buttonPop {
+                0% { transform: scale(0); opacity: 0; }
+                60% { transform: scale(1.1); }
+                100% { transform: scale(1); opacity: 1; }
+              }
+              @keyframes float {
+                0%, 100% { transform: translate(0, 0) rotate(0deg); }
+                33% { transform: translate(30px, -30px) rotate(120deg); }
+                66% { transform: translate(-20px, 20px) rotate(240deg); }
+              }
+            `}</style>
           </div>
         )}
       </div>
@@ -147,7 +441,7 @@ export default function Play() {
   )
 }
 
-function JepPlay({ questions, categories, scores, teamA, teamB, timerSeconds, onScores }: { questions: JeopardyQuestion[], categories: string[], scores:[number,number], teamA: string, teamB: string, timerSeconds: number, onScores:(a:number,b:number,questionId:string)=>void }) {
+function JepPlay({ questions, categories, scores, teamA, teamB, timerSeconds, onScores }: { questions: JeopardyQuestion[], categories: string[], scores:[number,number], teamA: string, teamB: string, timerSeconds: number, onScores:(a:number,b:number,questionId:string,points:number,teamName:string,isWrong:boolean)=>void }) {
   // Force component to use latest scores by using them directly
   const [selected, setSelected] = useState<JeopardyQuestion | null>(null)
   const [revealed, setRevealed] = useState(false)
@@ -227,8 +521,9 @@ function JepPlay({ questions, categories, scores, teamA, teamB, timerSeconds, on
     // Calculate new scores based on current scores prop
     const newScoreA = team === 0 ? scores[0] + selected.points : scores[0]
     const newScoreB = team === 1 ? scores[1] + selected.points : scores[1]
+    const teamName = team === 0 ? teamA : teamB
     // Update scores and mark question as used in one call
-    onScores(newScoreA, newScoreB, selected.id)
+    onScores(newScoreA, newScoreB, selected.id, selected.points, teamName, false)
     setSelected(null)
     setRevealed(false)
     setTimeRemaining(0)
@@ -237,7 +532,7 @@ function JepPlay({ questions, categories, scores, teamA, teamB, timerSeconds, on
   const wrongAnswer = () => {
     if (!selected) return
     // Mark question as used without awarding points
-    onScores(scores[0], scores[1], selected.id)
+    onScores(scores[0], scores[1], selected.id, 0, '', true)
     setSelected(null)
     setRevealed(false)
     setTimeRemaining(0)
