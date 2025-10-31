@@ -18,6 +18,12 @@ export default function Play() {
   const [successPoints, setSuccessPoints] = useState(0)
   const [successTeam, setSuccessTeam] = useState('')
   const [showWrongAnimation, setShowWrongAnimation] = useState(false)
+  const [wagerStage, setWagerStage] = useState<'wagering' | 'question' | 'scoring' | null>(null)
+  const [teamAWager, setTeamAWager] = useState<number>(0)
+  const [teamBWager, setTeamBWager] = useState<number>(0)
+  const [wagerRevealed, setWagerRevealed] = useState(false)
+  const [showWagerScores, setShowWagerScores] = useState(false)
+  const [wagerComplete, setWagerComplete] = useState(false)
 
   const toggleFullscreen = () => {
     const el: any = document.fullscreenElement || (document as any).webkitFullscreenElement
@@ -300,32 +306,232 @@ export default function Play() {
           </div>
         )}
 
-        <JepPlay 
-          questions={game.modes.jeopardy} 
-          categories={game.modes.jeopardyCategories || ['', '', '', '', '', '']} 
-          scores={[game.scores.teamA, game.scores.teamB]}
-          teamA={game.teams.teamA}
-          teamB={game.teams.teamB}
-          timerSeconds={game.questionTimerSeconds ?? 0}
-          onScores={(a,b,questionId,points,teamName,isWrong)=>{
-            if (!gameId) return
-            updateGameAndMarkUsed(gameId, { teamA: a, teamB: b }, questionId)
-            // Show success animation for correct answers
-            if (points > 0 && !isWrong) {
-              setSuccessPoints(points)
-              setSuccessTeam(teamName)
-              setShowSuccessAnimation(true)
-              setTimeout(() => setShowSuccessAnimation(false), 2000)
-            }
-            // Show wrong animation for incorrect answers
-            if (isWrong) {
-              setShowWrongAnimation(true)
-              setTimeout(() => setShowWrongAnimation(false), 2000)
-            }
-          }} 
-        />
+        {/* Only show JepPlay board if questions remain and not in wager stage */}
+        {game.modes.jeopardy.filter(q=>!q.used).length > 0 && !(wagerStage === 'question' && game.wagerQuestion) && (
+          <JepPlay 
+            questions={game.modes.jeopardy} 
+            categories={game.modes.jeopardyCategories || ['', '', '', '', '', '']} 
+            scores={[game.scores.teamA, game.scores.teamB]}
+            teamA={game.teams.teamA}
+            teamB={game.teams.teamB}
+            timerSeconds={game.questionTimerSeconds ?? 0}
+            onScores={(a,b,questionId,points,teamName,isWrong)=>{
+              if (!gameId) return
+              updateGameAndMarkUsed(gameId, { teamA: a, teamB: b }, questionId)
+              // Show success animation for correct answers
+              if (points > 0 && !isWrong) {
+                setSuccessPoints(points)
+                setSuccessTeam(teamName)
+                setShowSuccessAnimation(true)
+                setTimeout(() => setShowSuccessAnimation(false), 2000)
+              }
+              // Show wrong animation for incorrect answers
+              if (isWrong) {
+                setShowWrongAnimation(true)
+                setTimeout(() => setShowWrongAnimation(false), 2000)
+              }
+            }} 
+          />
+        )}
 
-        {game.modes.jeopardy.filter(q=>!q.used).length === 0 && (
+        {/* Show wager question - replaces the board when wagerStage is 'question' */}
+        {wagerStage === 'question' && game.wagerQuestion && (
+          <div className="min-h-[70vh] md:min-h-[78vh] flex flex-col justify-between rounded-lg border-2 border-yellow-400 bg-[#060CE9] text-yellow-400 p-4 md:p-6">
+            <div className="space-y-6">
+              <div className="text-sm md:text-base font-semibold text-yellow-300 uppercase tracking-wide text-center">
+                FINAL JEOPARDY
+              </div>
+              <div className="text-4xl md:text-6xl font-bold leading-tight text-center">
+                {game.wagerQuestion.question}
+              </div>
+              {wagerRevealed ? (
+                <div className="text-yellow-300 text-2xl md:text-4xl font-semibold text-center">Answer: {game.wagerQuestion.answer}</div>
+              ) : (
+                <div className="flex justify-center">
+                  <button 
+                    onClick={() => setWagerRevealed(true)} 
+                    className="px-8 py-4 rounded-lg bg-yellow-400 text-black font-bold text-xl hover:bg-yellow-300 transition"
+                  >
+                    Reveal Answer
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {wagerRevealed && (
+              <div className="space-y-3 pt-6">
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => {
+                      // Team A correct - they win their wager, Team B wrong - they lose their wager
+                      const newScoreA = game.scores.teamA + teamAWager
+                      const newScoreB = Math.max(0, game.scores.teamB - teamBWager)
+                      const currentGame = data.games.find(g => g.id === gameId)
+                      if (currentGame) {
+                        updateGame({ ...currentGame, scores: { teamA: newScoreA, teamB: newScoreB } })
+                      }
+                      setSuccessPoints(teamAWager)
+                      setSuccessTeam(game.teams.teamA)
+                      setShowSuccessAnimation(true)
+                      setTimeout(() => {
+                        setShowSuccessAnimation(false)
+                        setShowWagerScores(true)
+                        setTimeout(() => {
+                          setShowWagerScores(false)
+                          setWagerStage(null)
+                          setWagerComplete(true)
+                          setWagerRevealed(false)
+                          setTeamAWager(0)
+                          setTeamBWager(0)
+                        }, 3000)
+                      }, 2000)
+                    }}
+                    className="flex-1 px-6 py-4 rounded-lg bg-green-600 text-white font-bold text-lg hover:bg-green-700 transition"
+                  >
+                    {game.teams.teamA} Correct (+${teamAWager.toLocaleString()})
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Team B correct - they win their wager, Team A wrong - they lose their wager
+                      const newScoreA = Math.max(0, game.scores.teamA - teamAWager)
+                      const newScoreB = game.scores.teamB + teamBWager
+                      const currentGame = data.games.find(g => g.id === gameId)
+                      if (currentGame) {
+                        updateGame({ ...currentGame, scores: { teamA: newScoreA, teamB: newScoreB } })
+                      }
+                      setSuccessPoints(teamBWager)
+                      setSuccessTeam(game.teams.teamB)
+                      setShowSuccessAnimation(true)
+                      setTimeout(() => {
+                        setShowSuccessAnimation(false)
+                        setShowWagerScores(true)
+                        setTimeout(() => {
+                          setShowWagerScores(false)
+                          setWagerStage(null)
+                          setWagerComplete(true)
+                          setWagerRevealed(false)
+                          setTeamAWager(0)
+                          setTeamBWager(0)
+                        }, 3000)
+                      }, 2000)
+                    }}
+                    className="flex-1 px-6 py-4 rounded-lg bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition"
+                  >
+                    {game.teams.teamB} Correct (+${teamBWager.toLocaleString()})
+                  </button>
+                </div>
+                <button 
+                  onClick={() => {
+                    // Both wrong - they lose their wagers
+                    const newScoreA = Math.max(0, game.scores.teamA - teamAWager)
+                    const newScoreB = Math.max(0, game.scores.teamB - teamBWager)
+                    const currentGame = data.games.find(g => g.id === gameId)
+                    if (currentGame) {
+                      updateGame({ ...currentGame, scores: { teamA: newScoreA, teamB: newScoreB } })
+                    }
+                    setShowWrongAnimation(true)
+                    setTimeout(() => {
+                      setShowWrongAnimation(false)
+                      setShowWagerScores(true)
+                      setTimeout(() => {
+                        setShowWagerScores(false)
+                        setWagerStage(null)
+                        setWagerComplete(true)
+                        setWagerRevealed(false)
+                        setTeamAWager(0)
+                        setTeamBWager(0)
+                      }, 3000)
+                    }, 2000)
+                  }}
+                  className="w-full px-6 py-4 rounded-lg bg-red-600 text-white font-bold text-lg hover:bg-red-700 transition"
+                >
+                  Both Wrong (Lose Wagers)
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Check if all questions are done - show wager screen if question exists and not completed */}
+        {game.modes.jeopardy.filter(q=>!q.used).length === 0 && game.wagerQuestion && !wagerComplete && wagerStage === null && !showWagerScores && (
+          <div className="bg-gradient-to-br from-[#060CE9] via-[#0715E6] to-[#0a1dff] rounded-lg p-8">
+            <div className="text-center text-yellow-400 max-w-4xl mx-auto">
+              <div className="text-6xl md:text-8xl font-bold mb-8 animate-pulse">
+                FINAL JEOPARDY
+              </div>
+              <div className="text-3xl md:text-4xl mb-8">
+                {game.wagerQuestion.question}
+              </div>
+              <div className="text-2xl md:text-3xl mb-12">
+                Place Your Wagers!
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="bg-white/10 rounded-lg p-6 border-2 border-yellow-400">
+                  <div className="text-yellow-300 text-2xl font-bold mb-4">{game.teams.teamA}</div>
+                  <div className="text-white text-xl mb-4">Current Score: ${game.scores.teamA.toLocaleString()}</div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={game.scores.teamA}
+                    value={teamAWager}
+                    onChange={(e) => setTeamAWager(Math.max(0, Math.min(game.scores.teamA, parseInt(e.target.value) || 0)))}
+                    className="w-full px-4 py-3 text-2xl text-center border-2 border-yellow-400 rounded bg-black text-yellow-400 font-bold"
+                    placeholder="0"
+                  />
+                  <div className="text-yellow-300 text-sm mt-2">Wager: ${teamAWager.toLocaleString()}</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-6 border-2 border-yellow-400">
+                  <div className="text-yellow-300 text-2xl font-bold mb-4">{game.teams.teamB}</div>
+                  <div className="text-white text-xl mb-4">Current Score: ${game.scores.teamB.toLocaleString()}</div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={game.scores.teamB}
+                    value={teamBWager}
+                    onChange={(e) => setTeamBWager(Math.max(0, Math.min(game.scores.teamB, parseInt(e.target.value) || 0)))}
+                    className="w-full px-4 py-3 text-2xl text-center border-2 border-yellow-400 rounded bg-black text-yellow-400 font-bold"
+                    placeholder="0"
+                  />
+                  <div className="text-yellow-300 text-sm mt-2">Wager: ${teamBWager.toLocaleString()}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setWagerStage('question')}
+                className="px-8 py-4 bg-yellow-400 text-black font-bold text-2xl rounded-lg hover:bg-yellow-300 transition"
+              >
+                Start Final Question
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Show wager scores before winner */}
+        {showWagerScores && (() => {
+          const currentGame = data.games.find(g => g.id === gameId)
+          const finalScores = currentGame?.scores || game.scores
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50">
+              <div className="text-center text-white">
+                <div className="text-5xl md:text-7xl font-bold mb-8 text-yellow-400 animate-pulse">Final Scores</div>
+                <div className="text-4xl md:text-6xl mb-4" style={{ animation: 'fadeInUp 0.8s ease-out 0.2s both' }}>
+                  {game.teams.teamA}: ${finalScores.teamA.toLocaleString()}
+                </div>
+                <div className="text-4xl md:text-6xl mb-8" style={{ animation: 'fadeInUp 0.8s ease-out 0.4s both' }}>
+                  {game.teams.teamB}: ${finalScores.teamB.toLocaleString()}
+                </div>
+              </div>
+              <style>{`
+                @keyframes fadeInUp {
+                  0% { transform: translateY(30px); opacity: 0; }
+                  100% { transform: translateY(0); opacity: 1; }
+                }
+              `}</style>
+            </div>
+          )
+        })()}
+
+        {/* Winner screen - only show if no wager question or wager is complete */}
+        {game.modes.jeopardy.filter(q=>!q.used).length === 0 && (!game.wagerQuestion || wagerComplete) && !showWagerScores && (
           <div className="fixed inset-0 bg-gradient-to-br from-[#060CE9] via-[#0715E6] to-[#0a1dff] flex items-center justify-center z-50 overflow-hidden">
             {/* Background effects */}
             <div className="absolute inset-0 overflow-hidden">

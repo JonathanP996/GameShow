@@ -55,7 +55,7 @@ export default function Editor() {
 
         <div className="bg-white rounded border p-4">
           <h3 className="font-semibold mb-2">Game Settings</h3>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 mb-4">
             <label className="flex items-center gap-2">
               <span>Question Timer (seconds):</span>
               <input
@@ -71,6 +71,59 @@ export default function Editor() {
               />
             </label>
             <span className="text-sm text-slate-600">(0 = no timer)</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded border p-4">
+          <h3 className="font-semibold mb-4">Final Jeopardy Wager Question</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Question:</label>
+              <textarea
+                value={game.wagerQuestion?.question || ''}
+                onChange={(e) => {
+                  const currentWager = game.wagerQuestion || { question: '', answer: '' }
+                  updateGame({
+                    ...game,
+                    wagerQuestion: { ...currentWager, question: e.target.value }
+                  })
+                }}
+                className="w-full border rounded px-3 py-2"
+                placeholder="Enter Final Jeopardy question..."
+                rows={3}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Answer:</label>
+              <textarea
+                value={game.wagerQuestion?.answer || ''}
+                onChange={(e) => {
+                  const currentWager = game.wagerQuestion || { question: '', answer: '' }
+                  updateGame({
+                    ...game,
+                    wagerQuestion: { ...currentWager, answer: e.target.value }
+                  })
+                }}
+                className="w-full border rounded px-3 py-2"
+                placeholder="Enter the answer..."
+                rows={2}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-slate-600">
+                Leave empty to skip Final Jeopardy. Fill both fields to enable wagering.
+              </p>
+              {game.wagerQuestion?.question || game.wagerQuestion?.answer ? (
+                <button
+                  onClick={() => {
+                    updateGame({ ...game, wagerQuestion: undefined })
+                  }}
+                  className="px-4 py-2 rounded border border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  Clear Wager Question
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 

@@ -51,6 +51,11 @@ export type Progress = {
   round: number
 }
 
+export type WagerQuestion = {
+  question: string
+  answer: string
+}
+
 export type Game = {
   id: UUID
   name: string
@@ -59,6 +64,7 @@ export type Game = {
   scores: Scores
   progress: Progress
   questionTimerSeconds?: number // Timer in seconds for questions (0 = no timer)
+  wagerQuestion?: WagerQuestion // Final Jeopardy wager question
 }
 
 export type AppData = {
