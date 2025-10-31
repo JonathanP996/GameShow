@@ -6,14 +6,11 @@ import { useApp } from '../state/AppContext'
 export default function Dashboard() {
   const { data, createGame, removeGame } = useApp()
   const [name, setName] = useState('Friday Night Game')
-  const [modes, setModes] = useState<{pir: boolean, ff: boolean, jep: boolean}>({ pir: true, ff: true, jep: true })
   const navigate = useNavigate()
 
   const onCreate = () => {
     const id = createGame(name, {
-      priceIsRight: modes.pir ? [] : [],
-      familyFeud: modes.ff ? [] : [],
-      jeopardy: modes.jep ? [] : [],
+      jeopardy: [],
     })
     navigate(`/editor/${id}`)
   }
@@ -25,12 +22,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded border">
           <h2 className="font-semibold mb-3">Create a New Game</h2>
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-end">
-            <input className="border rounded px-3 py-2 w-full md:w-64" value={name} onChange={e=>setName(e.target.value)} />
-            <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={modes.pir} onChange={e=>setModes(m=>({...m, pir: e.target.checked}))}/> Price Is Right</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={modes.ff} onChange={e=>setModes(m=>({...m, ff: e.target.checked}))}/> Family Feud</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={modes.jep} onChange={e=>setModes(m=>({...m, jep: e.target.checked}))}/> Jeopardy</label>
-            </div>
+            <input className="border rounded px-3 py-2 w-full md:w-64" placeholder="Game Name" value={name} onChange={e=>setName(e.target.value)} />
             <button onClick={onCreate} className="bg-green-600 hover:bg-green-700 text-white rounded px-3 py-2">Create New Game</button>
           </div>
         </div>
@@ -44,11 +36,7 @@ export default function Dashboard() {
                 <div>
                   <div className="font-medium">{g.name}</div>
                   <div className="text-sm text-slate-600">
-                    Modes: {[
-                      g.modes.priceIsRight.length >= 0 ? 'Price Is Right' : null,
-                      g.modes.familyFeud.length >= 0 ? 'Family Feud' : null,
-                      g.modes.jeopardy.length >= 0 ? 'Jeopardy' : null,
-                    ].filter(Boolean).join(', ')}
+                    {g.modes.jeopardy.length} questions
                   </div>
                 </div>
                 <div className="flex gap-2">
