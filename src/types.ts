@@ -25,12 +25,15 @@ export type JeopardyQuestion = {
   answer: string
   points: number
   used?: boolean
+  categoryIndex?: number // 0-5 for which column this belongs to
+  rowIndex?: number // 0-4 for which row (100, 200, 300, 400, 500)
 }
 
 export type GameModes = {
   priceIsRight: PriceIsRightItem[]
   familyFeud: FamilyFeudQuestion[]
   jeopardy: JeopardyQuestion[]
+  jeopardyCategories?: string[] // 6 category names for the grid
 }
 
 export type Teams = {

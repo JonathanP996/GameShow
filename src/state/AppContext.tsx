@@ -9,6 +9,8 @@ type AppContextValue = {
   setCurrentUser: (name: string) => void
   createGame: (name: string, modes?: Partial<GameModes>) => string
   updateGame: (game: Game) => void
+  updateGameScores: (gameId: string, scores: { teamA: number, teamB: number }) => void
+  updateGameAndMarkUsed: (gameId: string, scores: { teamA: number, teamB: number }, questionId: string) => void
   getGame: (id: string) => Game | undefined
   removeGame: (id: string) => void
 }
@@ -41,6 +43,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         priceIsRight: modes.priceIsRight ?? [],
         familyFeud: modes.familyFeud ?? [],
         jeopardy: modes.jeopardy ?? [],
+        jeopardyCategories: modes.jeopardyCategories ?? ['', '', '', '', '', ''],
       },
       teams: { teamA: 'Team A', teamB: 'Team B' },
       scores: { teamA: 0, teamB: 0 },
@@ -51,10 +54,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateGame = (game: Game) => {
-    setData(prev => ({
-      ...prev,
-      games: prev.games.map(g => (g.id === game.id ? game : g)),
-    }))
+    setData(prev => {
+      // Find the current game in state
+      const currentGameInState = prev.games.find(g => g.id === game.id)
+      if (!currentGameInState) return prev
+      // Merge the update with current state, preserving anything not explicitly updated
+      const updatedGame = {
+        ...currentGameInState,
+        ...game,
+        // Ensure scores are explicitly set if provided
+        scores: game.scores || currentGameInState.scores,
+      }
+      const updatedGames = prev.games.map(g => (g.id === game.id ? updatedGame : g))
+      return {
+        ...prev,
+        games: updatedGames,
+      }
+    })
+  }
+
+  const updateGameScores = (gameId: string, scores: { teamA: number, teamB: number }) => {
+    setData(prev => {
+      const updatedGames = prev.games.map(g => 
+        g.id === gameId ? { ...g, scores } : g
+      )
+      return {
+        ...prev,
+        games: updatedGames,
+      }
+    })
+  }
+  
+  const updateGameAndMarkUsed = (gameId: string, scores: { teamA: number, teamB: number }, questionId: string) => {
+    setData(prev => {
+      const updatedGames = prev.games.map(g => {
+        if (g.id !== gameId) return g
+        const updated = g.modes.jeopardy.map(q => q.id === questionId ? { ...q, used: true } : q)
+        return {
+          ...g,
+          scores,
+          modes: { ...g.modes, jeopardy: updated },
+          progress: { ...g.progress, currentMode: 'jeopardy' as keyof GameModes },
+        }
+      })
+      return {
+        ...prev,
+        games: updatedGames,
+      }
+    })
   }
 
   const getGame = (id: string) => data.games.find(g => g.id === id)
@@ -69,6 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser,
     createGame,
     updateGame,
+    updateGameScores,
+    updateGameAndMarkUsed,
     getGame,
     removeGame,
   }), [data, currentUser])

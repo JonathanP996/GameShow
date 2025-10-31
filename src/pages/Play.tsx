@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import TopBar from '../components/TopBar'
 import Scoreboard from '../components/Scoreboard'
@@ -7,13 +7,22 @@ import { JeopardyQuestion, PriceIsRightItem } from '../types'
 
 export default function Play() {
   const { gameId } = useParams()
-  const { getGame, updateGame } = useApp()
-  const game = useMemo(() => gameId ? getGame(gameId) : undefined, [gameId, getGame])
+  const { getGame, updateGame, updateGameScores, updateGameAndMarkUsed, data } = useApp()
+  // Get game directly from data.games - this ensures component re-renders when data changes
+  const game = gameId ? data.games.find(g => g.id === gameId) : undefined
   const [mode, setMode] = useState<'pir'|'ff'|'jep'>(game?.progress.currentMode ? (game.progress.currentMode === 'priceIsRight' ? 'pir' : game.progress.currentMode === 'familyFeud' ? 'ff' : 'jep') : 'pir')
+  
   if (!game) return null
 
   const setScores = (a: number, b: number) => {
-    updateGame({ ...game, scores: { teamA: a, teamB: b }, progress: { ...game.progress, currentMode: mode === 'pir' ? 'priceIsRight' : mode === 'ff' ? 'familyFeud' : 'jeopardy' } })
+    if (!gameId) return
+    // Use dedicated function that directly updates scores without reading stale data
+    updateGameScores(gameId, { teamA: a, teamB: b })
+    // Also update progress separately
+    const currentGame = data.games.find(g => g.id === gameId)
+    if (currentGame) {
+      updateGame({ ...currentGame, progress: { ...currentGame.progress, currentMode: mode === 'pir' ? 'priceIsRight' : mode === 'ff' ? 'familyFeud' : 'jeopardy' } })
+    }
   }
 
   return (
@@ -26,14 +35,15 @@ export default function Play() {
             <button className={`px-3 py-2 rounded border ${mode==='ff'?'bg-blue-50 border-blue-400':''}`} onClick={()=>setMode('ff')}>Family Feud</button>
             <button className={`px-3 py-2 rounded border ${mode==='jep'?'bg-blue-50 border-blue-400':''}`} onClick={()=>setMode('jep')}>Jeopardy</button>
           </div>
-          <Scoreboard scores={game.scores} teamA={game.teams.teamA} teamB={game.teams.teamB} />
+          <Scoreboard key={`${game.scores.teamA}-${game.scores.teamB}`} scores={game.scores} teamA={game.teams.teamA} teamB={game.teams.teamB} />
         </div>
 
         {mode==='pir' && <PIRPlay items={game.modes.priceIsRight} scores={[game.scores.teamA, game.scores.teamB]} onScores={(a,b)=>setScores(a,b)} />}
         {mode==='ff' && <FFPlay questions={game.modes.familyFeud} scores={[game.scores.teamA, game.scores.teamB]} onScores={(a,b)=>setScores(a,b)} />}
-        {mode==='jep' && <JepPlay questions={game.modes.jeopardy} scores={[game.scores.teamA, game.scores.teamB]} onScores={(a,b)=>setScores(a,b)} onUse={(id)=>{
-          const updated = game.modes.jeopardy.map(q => q.id===id?{...q, used:true}:q)
-          updateGame({ ...game, modes: { ...game.modes, jeopardy: updated } })
+        {mode==='jep' && <JepPlay questions={game.modes.jeopardy} categories={game.modes.jeopardyCategories || ['', '', '', '', '', '']} scores={[game.scores.teamA, game.scores.teamB]} onScores={(a,b,questionId)=>{
+          // Update scores and mark question as used in one atomic operation
+          if (!gameId) return
+          updateGameAndMarkUsed(gameId, { teamA: a, teamB: b }, questionId)
         }} />}
 
         {game.scores.teamA !== game.scores.teamB && (game.modes.priceIsRight.length + game.modes.familyFeud.length + game.modes.jeopardy.filter(q=>!q.used).length) === 0 && (
@@ -110,51 +120,108 @@ function FFPlay({ questions, scores, onScores }: { questions: {question:string, 
   )
 }
 
-function JepPlay({ questions, scores, onScores, onUse }: { questions: JeopardyQuestion[], scores:[number,number], onScores:(a:number,b:number)=>void, onUse:(id:string)=>void }) {
-  const board = groupByCategory(questions)
+function JepPlay({ questions, categories, scores, onScores }: { questions: JeopardyQuestion[], categories: string[], scores:[number,number], onScores:(a:number,b:number,questionId:string)=>void }) {
+  // Force component to use latest scores by using them directly
   const [selected, setSelected] = useState<JeopardyQuestion | null>(null)
   const [revealed, setRevealed] = useState(false)
-  const select = (q: JeopardyQuestion) => { if (q.used) return; setSelected(q); setRevealed(false) }
-  const award = (team: 0 | 1) => { if (!selected) return; const next = [...scores] as [number, number]; next[team]+=selected.points; onScores(next[0], next[1]); onUse(selected.id); setSelected(null) }
+  const points = [100, 200, 300, 400, 500]
+  const categoryColors = ['bg-green-300', 'bg-purple-300', 'bg-orange-300', 'bg-blue-300', 'bg-amber-300', 'bg-yellow-300']
+  const cardColors = ['bg-green-100', 'bg-purple-100', 'bg-orange-100', 'bg-blue-100', 'bg-amber-100', 'bg-yellow-100']
+
+  const getQuestion = (catIdx: number, rowIdx: number) => {
+    return questions.find(q => q.categoryIndex === catIdx && q.rowIndex === rowIdx)
+  }
+
+  const select = (catIdx: number, rowIdx: number) => {
+    const q = getQuestion(catIdx, rowIdx)
+    if (!q || q.used) return
+    setSelected(q)
+    setRevealed(false)
+  }
+
+  const award = (team: 0 | 1) => {
+    if (!selected) return
+    // Calculate new scores based on current scores prop
+    const newScoreA = team === 0 ? scores[0] + selected.points : scores[0]
+    const newScoreB = team === 1 ? scores[1] + selected.points : scores[1]
+    // Update scores and mark question as used in one call
+    onScores(newScoreA, newScoreB, selected.id)
+    setSelected(null)
+    setRevealed(false)
+  }
+
   return (
-    <div className="bg-white border rounded p-4 space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {Object.entries(board).map(([cat, qs]) => (
-          <div key={cat} className="border rounded">
-            <div className="px-2 py-1 font-medium bg-slate-50 border-b">{cat}</div>
-            <div className="grid grid-cols-2 gap-2 p-2">
-              {qs.map(q => (
-                <button key={q.id} disabled={q.used} onClick={()=>select(q)} className={`px-2 py-2 rounded border ${q.used? 'opacity-40 cursor-not-allowed': ''}`}>{q.points}</button>
-              ))}
+    <div className="space-y-4">
+      <div className="bg-slate-50 p-4 rounded-lg border-4 border-black">
+        <div className="grid grid-cols-6 gap-2">
+          {/* Category row */}
+          {categories.map((cat, idx) => (
+            <div
+              key={idx}
+              className={`${categoryColors[idx]} border-2 border-black rounded px-2 py-3 text-center font-bold text-sm`}
+            >
+              {cat || `Category ${idx + 1}`}
             </div>
-          </div>
-        ))}
+          ))}
+          
+          {/* Question cards */}
+          {points.map((point, rowIdx) => (
+            categories.map((_, catIdx) => {
+              const q = getQuestion(catIdx, rowIdx)
+              const isUsed = q?.used || false
+              return (
+                <button
+                  key={`${catIdx}-${rowIdx}`}
+                  disabled={!q || isUsed}
+                  onClick={() => select(catIdx, rowIdx)}
+                  className={`${cardColors[catIdx]} border-2 border-black rounded px-2 py-6 text-center font-bold text-xl transition ${
+                    !q ? 'opacity-50 cursor-not-allowed' : isUsed ? 'opacity-30 cursor-not-allowed line-through' : 'hover:opacity-80 cursor-pointer'
+                  }`}
+                >
+                  {!q ? '' : isUsed ? 'X' : `$${point}`}
+                </button>
+              )
+            })
+          ))}
+        </div>
       </div>
+
       {selected && (
-        <div className="p-4 rounded border bg-slate-50 space-y-2">
-          <div className="text-sm text-slate-600">{selected.category} — {selected.points}</div>
-          <div className="text-lg font-medium">{selected.question}</div>
-          {revealed ? (
-            <div className="text-green-700">Answer: {selected.answer}</div>
-          ) : (
-            <button onClick={()=>setRevealed(true)} className="px-3 py-2 rounded bg-blue-600 text-white">Reveal Answer</button>
-          )}
-          <div className="flex gap-2">
-            <button onClick={()=>award(0)} className="px-3 py-2 rounded border">Award Team A</button>
-            <button onClick={()=>award(1)} className="px-3 py-2 rounded border">Award Team B</button>
+        <div className="p-4 rounded-lg border-2 border-black bg-white space-y-4">
+          <div className="text-sm text-slate-600 font-semibold">
+            {selected.category} — ${selected.points}
           </div>
+          <div className="text-2xl font-bold">{selected.question}</div>
+          {revealed ? (
+            <div className="text-green-700 text-xl font-semibold">Answer: {selected.answer}</div>
+          ) : (
+            <button 
+              onClick={() => setRevealed(true)} 
+              className="px-6 py-3 rounded-lg bg-blue-600 text-white font-bold text-lg hover:bg-blue-700"
+            >
+              Reveal Answer
+            </button>
+          )}
+          {revealed && (
+            <div className="flex gap-4 pt-4 border-t">
+              <button 
+                onClick={() => award(0)} 
+                className="flex-1 px-6 py-3 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700"
+              >
+                Award Team A (+${selected.points})
+              </button>
+              <button 
+                onClick={() => award(1)} 
+                className="flex-1 px-6 py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700"
+              >
+                Award Team B (+${selected.points})
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
-}
-
-function groupByCategory(questions: JeopardyQuestion[]) {
-  return questions.reduce<Record<string, JeopardyQuestion[]>>((acc, q)=>{
-    acc[q.category] = acc[q.category] || []
-    acc[q.category].push(q)
-    return acc
-  }, {})
 }
 
 
