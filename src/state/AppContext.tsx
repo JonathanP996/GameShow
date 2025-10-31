@@ -48,6 +48,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       teams: { teamA: 'Team A', teamB: 'Team B' },
       scores: { teamA: 0, teamB: 0 },
       progress: { currentMode: null, round: 1 },
+      questionTimerSeconds: 30, // Default 30 seconds
     }
     setData(prev => ({ ...prev, games: [newGame, ...prev.games] }))
     return id

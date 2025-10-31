@@ -42,7 +42,7 @@ export default function Dashboard() {
                 <div className="flex gap-2">
                   <Link to={`/editor/${g.id}`} className="px-3 py-2 rounded border">Edit</Link>
                   <Link to={`/play/${g.id}`} className="px-3 py-2 rounded bg-blue-600 text-white">Play</Link>
-                  <button onClick={()=>removeGame(g.id)} className="px-3 py-2 rounded border border-red-300 text-red-700">Delete</button>
+                  <button onClick={()=>{ if (window.confirm('Delete this game and all its questions?')) removeGame(g.id) }} className="px-3 py-2 rounded border border-red-300 text-red-700">Delete</button>
                 </div>
               </div>
             ))}

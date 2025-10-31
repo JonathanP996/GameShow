@@ -53,6 +53,27 @@ export default function Editor() {
           </Link>
         </div>
 
+        <div className="bg-white rounded border p-4">
+          <h3 className="font-semibold mb-2">Game Settings</h3>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2">
+              <span>Question Timer (seconds):</span>
+              <input
+                type="number"
+                min="0"
+                max="300"
+                value={game.questionTimerSeconds ?? 30}
+                onChange={(e) => {
+                  const seconds = parseInt(e.target.value) || 0
+                  updateGame({ ...game, questionTimerSeconds: seconds })
+                }}
+                className="border rounded px-2 py-1 w-20"
+              />
+            </label>
+            <span className="text-sm text-slate-600">(0 = no timer)</span>
+          </div>
+        </div>
+
         <div className="bg-white rounded border">
           <div className="p-4">
             <JepSection onAdd={saveJep} onRemove={removeJep} questions={game.modes.jeopardy} categories={game.modes.jeopardyCategories || ['', '', '', '', '', '']} onCategoriesUpdate={updateCategories} />
@@ -162,8 +183,14 @@ function JepSection({ questions, onAdd, onRemove, categories, onCategoriesUpdate
               <button onClick={saveQuestion} className="px-4 py-2 bg-green-600 text-white rounded">Save</button>
               <button onClick={() => {
                 const existing = getQuestion(editingCard.categoryIndex, editingCard.rowIndex)
-                if (existing) onRemove(existing.id)
-                setEditingCard(null)
+                if (existing) {
+                  if (window.confirm('Delete this clue permanently?')) {
+                    onRemove(existing.id)
+                    setEditingCard(null)
+                  }
+                } else {
+                  setEditingCard(null)
+                }
               }} className="px-4 py-2 bg-red-600 text-white rounded">Delete</button>
               <button onClick={() => setEditingCard(null)} className="px-4 py-2 border rounded">Cancel</button>
             </div>

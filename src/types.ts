@@ -58,6 +58,7 @@ export type Game = {
   teams: Teams
   scores: Scores
   progress: Progress
+  questionTimerSeconds?: number // Timer in seconds for questions (0 = no timer)
 }
 
 export type AppData = {
